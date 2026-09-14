@@ -110,7 +110,7 @@
 
 <script>
   // MASUKKAN URL DEPLOYMENT APPS SCRIPT ANDA DI SINI
-  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxiQzkOtyQWV1HNJ57_QqznrDrwdAg2hA4ONrSE1eDaQ2GWTNrZhmNso_tjjrrc8t5a/exec";
+  const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw27Ql--HetfeaG726qK-i5yzBTWsdyLy2PwwLQoZ0FvCFyZhMf5jw5PTP5NOYdm8Q-1Q/exec";
 
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
@@ -136,20 +136,42 @@
   const authMsg = document.getElementById('auth-msg');
 
   // API Integration via fetch (Text/plain)
-  async function apiCall(data) {
+async function apiCall(data) {
+  try {
+    // Menggunakan URLSearchParams agar request terkirim sebagai application/x-www-form-urlencoded
+    const params = new URLSearchParams();
+    for (const key in data) {
+      params.append(key, data[key]);
+    }
+
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: params,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error("HTTP Status " + response.status);
+    }
+
+    return await response.json();
+  } catch (e) {
+    console.error("API Call Error:", e);
+    
+    // Fallback menggunakan GET jika POST diblokir CORS oleh Browser
     try {
-      const response = await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(data)
-      });
-      return await response.json();
-    } catch (e) {
-      console.error(e);
-      alert("Gagal terhubung ke Google Sheets server!");
+      const queryString = new URLSearchParams(data).toString();
+      const getResponse = await fetch(`${GOOGLE_SCRIPT_URL}?${queryString}`);
+      return await getResponse.json();
+    } catch (err) {
+      console.error("GET Fallback Error:", err);
+      alert("Gagal terhubung ke Google Sheets server! Periksa kembali Web App URL & izin Deploy.");
       return { result: "error" };
     }
   }
+}
 
   // Auth Functions
   authForm.addEventListener('submit', async (e) => {
