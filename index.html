@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Contra 20 Levels - Web & Mobile</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body, html { width: 100%; height: 100%; background: #111; color: #fff; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    
+    #game-container { position: relative; width: 100vw; height: 100vh; max-width: 900px; max-height: 500px; background: #222; overflow: hidden; border: 2px solid #555; box-shadow: 0 0 20px rgba(0,255,0,0.2); }
+    canvas { width: 100%; height: 100%; background: #050b14; display: block; }
+    
+    /* Overlay Menus */
+    .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 25, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; padding: 20px; }
+    .hidden { display: none !important; }
+    
+    h1 { color: #00ff66; margin-bottom: 20px; text-shadow: 0 0 10px #00ff66; font-size: 28px; text-align: center; }
+    h2 { color: #ffcc00; margin-bottom: 15px; }
+    
+    form, .menu-box { display: flex; flex-direction: column; width: 100%; max-width: 320px; gap: 10px; }
+    input { padding: 12px; border-radius: 5px; border: 1px solid #00ff66; background: #000; color: #fff; font-size: 16px; outline: none; }
+    button { padding: 12px; border-radius: 5px; border: none; background: #00ff66; color: #000; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+    button:active { transform: scale(0.98); background: #00cc52; }
+    .btn-secondary { background: #444; color: #fff; }
+    
+    /* HUD Overlay */
+    #hud { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #00ff66; z-index: 5; pointer-events: none; text-shadow: 1px 1px 2px #000; }
+    
+    /* Mobile Controls */
+    #touch-controls { position: absolute; bottom: 10px; left: 0; right: 0; height: 120px; display: flex; justify-content: space-between; padding: 0 15px; z-index: 6; pointer-events: none; }
+    .touch-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 20px; color: #fff; pointer-events: auto; touch-action: manipulation; }
+    .d-pad { display: grid; grid-template-columns: repeat(3, 45px); grid-template-rows: repeat(2, 45px); gap: 5px; }
+    .action-pad { display: flex; gap: 15px; align-items: flex-end; }
+    .btn-fire { background: rgba(255, 50, 50, 0.4); width: 65px; height: 65px; }
+    .btn-jump { background: rgba(50, 150, 255, 0.4); width: 65px; height: 65px; }
+    
+    /* Leaderboard Table */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 14px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #444; }
+    th { color: #00ff66; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-user">Player: -</div>
+    <div id="hud-hp">HP: 100</div>
+    <div id="hud-score">Score: 0</div>
+    <div id="hud-level">Level: 1/20</div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Login/Register Screen -->
+  <div id="auth-screen" class="screen">
+    <h1>CONTRA 20 LEVELS</h1>
+    <form id="auth-form">
+      <input type="text" id="username" placeholder="Username" required maxlength="12">
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit" id="btn-login">LOGIN</button>
+      <button type="button" id="btn-register" class="btn-secondary">REGISTER</button>
+    </form>
+    <p id="auth-msg" style="margin-top: 10px; color: #ff5555; font-size: 14px; text-align:center;"></p>
+  </div>
+
+  <!-- Main Menu Screen -->
+  <div id="menu-screen" class="screen hidden">
+    <h1>CONTRA MOBILE</h1>
+    <div class="menu-box">
+      <button id="btn-play">PLAY GAME</button>
+      <button id="btn-leaderboard" class="btn-secondary">LEADERBOARD</button>
+      <button id="btn-logout" style="background:#ff4444; color:#fff;">LOGOUT</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard Screen -->
+  <div id="lb-screen" class="screen hidden">
+    <h2>TOP PLAYERS</h2>
+    <div style="max-height: 250px; overflow-y: auto; width: 100%; max-width: 350px;">
+      <table id="lb-table">
+        <thead>
+          <tr><th>Rank</th><th>User</th><th>Score</th><th>Level</th></tr>
+        </thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+    <button id="btn-lb-back" class="btn-secondary" style="margin-top: 15px;">KEMBALI</button>
+  </div>
+
+  <!-- Touch Controls (Mobile) -->
+  <div id="touch-controls">
+    <div class="d-pad">
+      <div></div>
+      <div class="touch-btn" id="btn-up">▲</div>
+      <div></div>
+      <div class="touch-btn" id="btn-left">◄</div>
+      <div></div>
+      <div class="touch-btn" id="btn-right">►</div>
+    </div>
+    <div class="action-pad">
+      <div class="touch-btn btn-jump" id="btn-jump">JUMP</div>
+      <div class="touch-btn btn-fire" id="btn-fire">FIRE</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // GANTI URL DI BAWAH INI DENGAN URL GOOGLE APPS SCRIPT DEPLOYMENT ANDA!
+  const GOOGLE_SCRIPT_URL = https://script.google.com/macros/s/AKfycbxiQzkOtyQWV1HNJ57_QqznrDrwdAg2hA4ONrSE1eDaQ2GWTNrZhmNso_tjjrrc8t5a/exec;
+
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Set ukuran canvas internal
+  canvas.width = 800;
+  canvas.height = 400;
+
+  // State App
+  let currentUser = null;
+  let userScore = 0;
+  let userLevel = 1;
+
+  // State Game Loop
+  let gameRunning = false;
+  let animationFrameId;
+
+  // Controls State
+  const keys = { left: false, right: false, up: false, jump: false, fire: false };
+
+  // DOM Elements
+  const authScreen = document.getElementById('auth-screen');
+  const menuScreen = document.getElementById('menu-screen');
+  const lbScreen = document.getElementById('lb-screen');
+  const authForm = document.getElementById('auth-form');
+  const authMsg = document.getElementById('auth-msg');
+
+  // --- INTEGRASI GOOGLE SHEETS API ---
+  async function apiCall(data) {
+    if(GOOGLE_SCRIPT_URL.includes("YOUR_SCRIPT_ID_HERE")) {
+      console.warn("URL Google Script belum diatur. Menggunakan mode simulasi lokal.");
+      return simulateApi(data);
+    }
+    try {
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      return await response.json();
+    } catch (e) {
+      alert("Gagal terhubung ke Google Sheets server!");
+      return { result: "error" };
+    }
+  }
+
+  // Fallback Simulasi jika Script belum diisi
+  function simulateApi(data) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        if (data.action === "login") resolve({ result: "success", score: userScore, level: userLevel });
+        if (data.action === "register") resolve({ result: "registered" });
+        if (data.action === "updateScore") resolve({ result: "updated" });
+        if (data.action === "getLeaderboard") resolve({ result: "success", leaderboard: [
+          {username: "Player1", score: 5000, level: 20},
+          {username: "Hero", score: 3200, level: 12},
+          {username: data.username || "You", score: userScore, level: userLevel}
+        ]});
+      }, 300);
+    });
+  }
+
+  // --- EVENT LISTENERS UI ---
+  authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    authMsg.innerText = "Processing...";
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    
+    const res = await apiCall({ action: "login", username: u, password: p });
+    if (res.result === "success") {
+      currentUser = u;
+      userScore = res.score || 0;
+      userLevel = res.level || 1;
+      showScreen(menuScreen);
+      updateHUD();
+    } else {
+      authMsg.innerText = "Login Gagal! Username/Password salah.";
+    }
+  });
+
+  document.getElementById('btn-register').addEventListener('click', async () => {
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    if(!u || !p) { authMsg.innerText = "Isi username & password!"; return; }
+    authMsg.innerText = "Registering...";
+    
+    const res = await apiCall({ action: "register", username: u, password: p });
+    if (res.result === "registered") {
+      authMsg.style.color = "#00ff66";
+      authMsg.innerText = "Registrasi Berhasil! Silakan Click LOGIN.";
+    } else {
+      authMsg.style.color = "#ff5555";
+      authMsg.innerText = "Username sudah digunakan!";
+    }
+  });
+
+  document.getElementById('btn-play').addEventListener('click', () => {
+    showScreen(null);
+    startGame();
+  });
+
+  document.getElementById('btn-leaderboard').addEventListener('click', async () => {
+    showScreen(lbScreen);
+    const tbody = document.getElementById('lb-body');
+    tbody.innerHTML = "<tr><td colspan='4'>Loading...</td></tr>";
+    
+    const res = await apiCall({ action: "getLeaderboard" });
+    if (res.result === "success") {
+      tbody.innerHTML = "";
+      res.leaderboard.forEach((item, index) => {
+        tbody.innerHTML += `<tr>
+          <td>${index + 1}</td>
+          <td>${item.username}</td>
+          <td>${item.score}</td>
+          <td>Lvl ${item.level}</td>
+        </tr>`;
+      });
+    }
+  });
+
+  document.getElementById('btn-lb-back').addEventListener('click', () => showScreen(menuScreen));
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    currentUser = null;
+    showScreen(authScreen);
+  });
+
+  function showScreen(screen) {
+    [authScreen, menuScreen, lbScreen].forEach(s => s.classList.add('hidden'));
+    if (screen) screen.classList.remove('hidden');
+  }
+
+  function updateHUD() {
+    document.getElementById('hud-user').innerText = `Player: ${currentUser || '-'}`;
+    document.getElementById('hud-hp').innerText = `HP: ${player ? player.hp : 100}`;
+    document.getElementById('hud-score').innerText = `Score: ${userScore}`;
+    document.getElementById('hud-level').innerText = `Level: ${userLevel}/20`;
+  }
+
+  // --- CONTROLS HANDLER (KEYBOARD & TOUCH) ---
+  window.addEventListener('keydown', e => handleKey(e.code, true));
+  window.addEventListener('keyup', e => handleKey(e.code, false));
+
+  function handleKey(code, isPressed) {
+    if (code === 'ArrowLeft' || code === 'KeyA') keys.left = isPressed;
+    if (code === 'ArrowRight' || code === 'KeyD') keys.right = isPressed;
+    if (code === 'ArrowUp' || code === 'KeyW') keys.up = isPressed;
+    if (code === 'Space' || code === 'KeyK') keys.jump = isPressed;
+    if (code === 'KeyJ' || code === 'KeyZ') keys.fire = isPressed;
+  }
+
+  function bindTouch(id, keyProp) {
+    const el = document.getElementById(id);
+    const start = (e) => { e.preventDefault(); keys[keyProp] = true; };
+    const end = (e) => { e.preventDefault(); keys[keyProp] = false; };
+    el.addEventListener('touchstart', start);
+    el.addEventListener('touchend', end);
+    el.addEventListener('mousedown', start);
+    el.addEventListener('mouseup', end);
+  }
+  bindTouch('btn-left', 'left');
+  bindTouch('btn-right', 'right');
+  bindTouch('btn-up', 'up');
+  bindTouch('btn-jump', 'jump');
+  bindTouch('btn-fire', 'fire');
+
+  // --- GAME ENGINE ---
+  let player, bullets, enemies, enemyBullets, platforms, finishLine;
+
+  class Player {
+    constructor() {
+      this.x = 50;
+      this.y = 200;
+      this.w = 25;
+      this.h = 40;
+      this.vx = 0;
+      this.vy = 0;
+      this.speed = 4;
+      this.jumpPower = -10;
+      this.grounded = false;
+      this.hp = 100;
+      this.lastShoot = 0;
+    }
+
+    update() {
+      if (keys.left) this.vx = -this.speed;
+      else if (keys.right) this.vx = this.speed;
+      else this.vx = 0;
+
+      if (keys.jump && this.grounded) {
+        this.vy = this.jumpPower;
+        this.grounded = false;
+      }
+
+      // Tembak (Cooldown 150ms)
+      if (keys.fire && Date.now() - this.lastShoot > 150) {
+        bullets.push(new Bullet(this.x + this.w, this.y + 15, 8, keys.up ? -4 : 0));
+        this.lastShoot = Date.now();
+      }
+
+      // Gravitasi
+      this.vy += 0.5;
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Batasi Layar Kiri/Kanan
+      if (this.x < 0) this.x = 0;
+
+      // Kolisi Platform
+      this.grounded = false;
+      platforms.forEach(p => {
+        if (this.x < p.x + p.w && this.x + this.w > p.x &&
+            this.y + this.h >= p.y && this.y + this.h <= p.y + p.h && this.vy >= 0) {
+          this.grounded = true;
+          this.vy = 0;
+          this.y = p.y - this.h;
+        }
+      });
+
+      // Jatuh ke jurang
+      if (this.y > canvas.height) this.takeDamage(100);
+    }
+
+    draw() {
+      ctx.fillStyle = '#00ff66';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+      // Senjata
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(this.x + (keys.left ? -10 : this.w), this.y + 12, 10, 5);
+    }
+
+    takeDamage(amt) {
+      this.hp -= amt;
+      updateHUD();
+      if (this.hp <= 0) gameOver();
+    }
+  }
+
+  class Bullet {
+    constructor(x, y, vx, vy) {
+      this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+      this.r = 4;
+    }
+    update() { this.x += this.vx; this.y += this.vy; }
+    draw() {
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  class Enemy {
+    constructor(x, y, type) {
+      this.x = x; this.y = y; this.w = 25; this.h = 35;
+      this.type = type; // 1: Jalan, 2: Tembak
+      this.vx = -1.5;
+      this.lastShoot = 0;
+    }
+    update() {
+      this.x += this.vx;
+      if (this.type === 2 && Date.now() - this.lastShoot > 2000) {
+        enemyBullets.push(new Bullet(this.x, this.y + 10, -5, 0));
+        this.lastShoot = Date.now();
+      }
+    }
+    draw() {
+      ctx.fillStyle = this.type === 1 ? '#ff3333' : '#ff00ee';
+      ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+  }
+
+  function generateLevel(lvl) {
+    platforms = [
+      { x: 0, y: 350, w: 300, h: 50 },
+      { x: 350, y: 300, w: 200, h: 20 },
+      { x: 600, y: 250, w: 300, h: 20 },
+      { x: 950, y: 350, w: 400, h: 50 }
+    ];
+
+    // Kompleksitas bertambah tiap level
+    let extraPlats = Math.min(lvl * 2, 15);
+    for(let i = 0; i < extraPlats; i++) {
+      platforms.push({
+        x: 1300 + (i * 180),
+        y: 200 + (Math.sin(i) * 80),
+        w: 100, h: 20
+      });
+    }
+
+    let endX = 1300 + (extraPlats * 180) + 100;
+    platforms.push({ x: endX, y: 350, w: 300, h: 50 });
+    finishLine = endX + 150;
+
+    enemies = [];
+    // Generate musuh bertahap sesuai Level
+    for (let x = 400; x < finishLine - 200; x += Math.max(150, 400 - lvl * 15)) {
+      enemies.push(new Enemy(x, 200, Math.random() > 0.5 ? 1 : 2));
+    }
+  }
+
+  function startGame() {
+    player = new Player();
+    bullets = [];
+    enemyBullets = [];
+    generateLevel(userLevel);
+    gameRunning = true;
+    updateHUD();
+    gameLoop();
+  }
+
+  function gameLoop() {
+    if (!gameRunning) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Camera follow player
+    ctx.save();
+    let offsetX = -player.x + 100;
+    if (offsetX > 0) offsetX = 0;
+    ctx.translate(offsetX, 0);
+
+    // Draw Platforms
+    ctx.fillStyle = '#334466';
+    platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+    // Draw Finish Line
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(finishLine, 150, 10, 200);
+
+    // Player
+    player.update();
+    player.draw();
+
+    // Player Bullets
+    bullets.forEach((b, i) => {
+      b.update();
+      b.draw();
+      // Hit Enemy
+      enemies.forEach((e, ei) => {
+        if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
+          enemies.splice(ei, 1);
+          bullets.splice(i, 1);
+          userScore += 100;
+          updateHUD();
+        }
+      });
+      if (b.x > player.x + 800) bullets.splice(i, 1);
+    });
+
+    // Enemy Bullets
+    enemyBullets.forEach((eb, i) => {
+      eb.update();
+      eb.draw();
+      // Hit Player
+      if (eb.x > player.x && eb.x < player.x + player.w && eb.y > player.y && eb.y < player.y + player.h) {
+        enemyBullets.splice(i, 1);
+        player.takeDamage(15);
+      }
+    });
+
+    // Enemies
+    enemies.forEach((e) => {
+      e.update();
+      e.draw();
+      // Touch player
+      if (player.x < e.x + e.w && player.x + player.w > e.x && player.y < e.y + e.h && player.y + player.h > e.y) {
+        player.takeDamage(1);
+      }
+    });
+
+    // Level Clear Check
+    if (player.x >= finishLine) {
+      levelComplete();
+      ctx.restore();
+      return;
+    }
+
+    ctx.restore();
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  async function levelComplete() {
+    gameRunning = false;
+    cancelAnimationFrame(animationFrameId);
+    
+    userScore += 500;
+    if (userLevel < 20) {
+      userLevel++;
+      alert(`LEVEL ${userLevel - 1} CLEAR! Menuju Level ${userLevel}`);
+    } else {
+      alert(`SELAMAT! Anda telah menamatkan seluruh 20 LEVEL!`);
+    }
+    
+    updateHUD();
+    await apiCall({ action: "updateScore", username: currentUser, score: userScore, level: userLevel });
+    showScreen(menuScreen);
+  }
+
+  async function gameOver() {
+    gameRunning = false;
+    cancelAnimationFrame(animationFrameId);
+    alert("GAME OVER! Coba Lagi.");
+    await apiCall({ action: "updateScore", username: currentUser, score: userScore, level: userLevel });
+    showScreen(menuScreen);
+  }
+</script>
+</body>
+</html>
